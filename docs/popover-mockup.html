@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCUsageBar — palette & material explorer</title>
+<style>
+  :root {
+    --surf-a: 0.72;       /* surface opacity (translucency slider)  */
+    --tint-rgb: 124 111 232;
+    --tint-a: 0.0;        /* surface tint strength                  */
+    --mono: ui-monospace, "SF Mono", "Menlo", "JetBrains Mono", monospace;
+    --ui: -apple-system, "SF Pro Text", system-ui, sans-serif;
+    --meter-h: 14px;      /* progress bar height (1x = 7px)         */
+    --meter-r: 4px;       /* progress bar corner radius            */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--ui);
+    min-height: 100vh;
+    color: #fff;
+    background-attachment: fixed;
+    background-size: cover;
+    transition: background .4s ease;
+    padding: 96px 32px 64px;
+  }
+
+  /* ---------- wallpapers (test translucency against varied backdrops) ---------- */
+  body[data-wall="sky"] {
+    background:
+      radial-gradient(120% 90% at 18% -10%, rgba(255,255,255,.85), transparent 42%),
+      radial-gradient(80% 60% at 78% 8%, rgba(255,255,255,.55), transparent 40%),
+      radial-gradient(60% 50% at 60% 30%, rgba(255,255,255,.35), transparent 45%),
+      linear-gradient(180deg, #4a7fb5 0%, #6ea3cf 45%, #9cc2db 100%);
+  }
+  body[data-wall="sunset"] {
+    background:
+      radial-gradient(90% 70% at 80% 0%, rgba(255,221,150,.8), transparent 50%),
+      linear-gradient(180deg, #2a2150 0%, #7a3b6e 40%, #d9744f 78%, #f0a563 100%);
+  }
+  body[data-wall="graphite"] {
+    background:
+      radial-gradient(80% 60% at 30% 0%, #3a3f47, transparent 60%),
+      linear-gradient(180deg, #23262b 0%, #16181c 100%);
+  }
+  body[data-wall="vivid"] {
+    background:
+      radial-gradient(50% 60% at 12% 20%, #ff5d8f, transparent 55%),
+      radial-gradient(55% 55% at 85% 18%, #ffb05d, transparent 55%),
+      radial-gradient(60% 60% at 70% 85%, #3dd6c0, transparent 55%),
+      radial-gradient(60% 60% at 20% 90%, #6a5cff, transparent 55%),
+      linear-gradient(135deg, #1d1340, #102a3a);
+  }
+
+  /* ---------- control bar ---------- */
+  .bar {
+    position: fixed; inset: 0 0 auto 0; z-index: 10;
+    display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
+    padding: 12px 22px;
+    background: rgba(20,22,27,.72);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .bar .group { display: flex; align-items: center; gap: 8px; }
+  .bar .lbl {
+    font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+    color: rgba(255,255,255,.45); font-weight: 600;
+  }
+  .seg { display: flex; background: rgba(255,255,255,.07); border-radius: 8px; padding: 2px; }
+  .seg button {
+    font: inherit; font-size: 12px; color: rgba(255,255,255,.7);
+    border: 0; background: transparent; padding: 5px 11px; border-radius: 6px;
+    cursor: pointer; transition: .15s;
+  }
+  .seg button:hover { color: #fff; }
+  .seg button.on { background: rgba(255,255,255,.16); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  input[type=range] { accent-color: #8b7fe8; width: 150px; }
+  .val { font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,.6); width: 34px; }
+
+  /* ---------- grid of mockups ---------- */
+  .grid {
+    display: grid; gap: 36px 40px;
+    grid-template-columns: repeat(auto-fill, minmax(470px, 1fr));
+    max-width: 1480px; margin: 0 auto;
+  }
+  .card-label {
+    display: flex; align-items: baseline; gap: 10px; margin: 0 4px 10px;
+  }
+  .card-label h2 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; color: #fff;
+    text-shadow: 0 1px 8px rgba(0,0,0,.4); }
+  .card-label p { font-size: 12px; color: rgba(255,255,255,.7); text-shadow: 0 1px 6px rgba(0,0,0,.5); }
+  .badge {
+    font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    background: #8b7fe8; color: #fff; padding: 2px 7px; border-radius: 5px;
+  }
+
+  /* ---------- the popover replica ---------- */
+  .popover {
+    position: relative; isolation: isolate;
+    border-radius: 14px; overflow: hidden;
+    background: rgb(var(--surf-rgb) / var(--surf-a));
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid var(--edge);
+    box-shadow: 0 22px 55px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.25);
+    color: var(--txt-1);
+    font-family: var(--mono);
+  }
+  .popover::before { /* tint overlay */
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(180deg,
+      rgb(var(--tint-rgb) / calc(var(--tint-a) * 1.4)),
+      rgb(var(--tint-rgb) / var(--tint-a)) 60%,
+      transparent);
+  }
+
+  /* theme tokens carried on the .popover element */
+  .popover[data-theme="dark"] {
+    --surf-rgb: 32 37 46;
+    --edge: rgba(255,255,255,.09);
+    --txt-1: rgba(255,255,255,.92);
+    --txt-2: rgba(255,255,255,.55);
+    --txt-3: rgba(255,255,255,.4);
+    --head-bg: rgba(255,255,255,.045);
+    --divider: rgba(255,255,255,.12);
+    --track: rgba(255,255,255,.09);
+    --link: #6aa8ff;
+  }
+  .popover[data-theme="light"] {
+    --surf-rgb: 238 244 248;
+    --edge: rgba(0,0,0,.07);
+    --txt-1: rgba(0,0,0,.85);
+    --txt-2: rgba(0,0,0,.5);
+    --txt-3: rgba(0,0,0,.38);
+    --head-bg: rgba(0,0,0,.035);
+    --divider: rgba(0,0,0,.1);
+    --track: rgba(0,0,0,.08);
+    --link: #2f7be8;
+  }
+
+  .phead {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px 6px; background: var(--head-bg);
+  }
+  .pname { font-size: 12px; font-weight: 600; color: var(--txt-2); }
+  .plink { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--link);
+    display: flex; align-items: center; gap: 4px; text-decoration: none; }
+  .pbody { padding: 12px 14px 10px; }
+  .divider { height: 1px; background: var(--divider); }
+
+  .metric { margin-bottom: 12px; }
+  .metric:last-of-type { margin-bottom: 4px; }
+  .mtop { display: flex; align-items: baseline; gap: 12px; margin-bottom: 5px; }
+  .mtitle { font-size: 13px; font-weight: 600; color: var(--txt-1); }
+  .mval { margin-left: auto; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .meter { height: var(--meter-h); border-radius: var(--meter-r); background: var(--track); overflow: hidden; }
+  .fill { height: 100%; border-radius: var(--meter-r); }
+  .mdetail { font-size: 13px; color: var(--txt-2); margin-top: 5px; }
+
+  .fetch { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--txt-2); margin-top: 14px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--txt-3); }
+</style>
+</head>
+<body data-wall="sky">
+
+  <div class="bar">
+    <div class="group">
+      <span class="lbl">Theme</span>
+      <div class="seg" id="theme">
+        <button data-v="dark" class="on">Dark</button>
+        <button data-v="light">Light</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="lbl">Wallpaper</span>
+      <div class="seg" id="wall">
+        <button data-v="sky" class="on">Sky</button>
+        <button data-v="sunset">Sunset</button>
+        <button data-v="graphite">Graphite</button>
+        <button data-v="vivid">Vivid</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="lbl">Tint</span>
+      <div class="seg" id="tint">
+        <button data-v="0" class="on">None</button>
+        <button data-v="violet">Violet</button>
+        <button data-v="slate">Slate</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="lbl">Bar height</span>
+      <div class="seg" id="barh">
+        <button data-v="7">1×</button>
+        <button data-v="14" class="on">2×</button>
+        <button data-v="21">3×</button>
+        <button data-v="28">4×</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="lbl">Corners</span>
+      <div class="seg" id="barr">
+        <button data-v="4" class="on">Round</button>
+        <button data-v="2">Soft</button>
+        <button data-v="0">Square</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="lbl">Translucency</span>
+      <input type="range" id="alpha" min="35" max="98" value="72">
+      <span class="val" id="alphaVal">.72</span>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+<script>
+  // ---------- data (from your screenshot) ----------
+  const PROVIDERS = [
+    { name: "Claude", usage: true, metrics: [
+      { title: "Current session", val: "53% used", pct: 53, kind: "used",
+        detail: "Resets in 2h 24m at 12:29pm (America/Los_Angeles)" },
+      { title: "Current week (all models)", val: "63% used", pct: 63, kind: "used",
+        detail: "Resets in 1 day on Jun 28 at 8:59pm (America/Los_Angeles)" },
+    ]},
+    { name: "Codex", usage: true, metrics: [
+      { title: "5h limit", val: "100% used", pct: 100, kind: "used",
+        detail: "Resets in 2h 39m at 12:44pm (America/Los_Angeles)" },
+      { title: "Weekly limit", val: "60% used", pct: 60, kind: "used",
+        detail: "Resets in 4 days on Jul 1 at 4:28pm (America/Los_Angeles)" },
+      { title: "Credits", val: "129 credits", pct: null, kind: "quantity", detail: null },
+    ]},
+  ];
+
+  // ---------- palettes ----------
+  const PALETTES = {
+    violetWarn: { label: "Violet + Warn", desc: "Violet ≤60% · amber 60–80% · coral >80%", badge: "recommended",
+      mode: "severity", strict: true, grad: true,
+      sev: { high:"#E8675C", mid:"#E3A24A", low:"#8B7FE8" }, quantity:"#A99BFF" },
+    soft: { label: "Soft Semantic", desc: "Muted traffic-light + gradient fills",
+      mode: "severity", grad: true, sev: { high:"#E8675C", mid:"#E3A24A", low:"#5DB37E" }, quantity:"#52AFC6" },
+    violet: { label: "Monochrome Violet", desc: "One Claude-violet accent — closest to the old terminal",
+      mode: "mono", grad: true, accent: "#8B7FE8", quantity: "#A99BFF" },
+    dual: { label: "Dual Accent", desc: "Claude violet · Codex teal — sections read distinct",
+      mode: "provider", grad: true, providers: { Claude:"#8B7FE8", Codex:"#3FB5A4" },
+      quantityFor: { Claude:"#A99BFF", Codex:"#6FD3C4" } },
+    ocean: { label: "Ocean Severity", desc: "Cool palette, keeps the at-a-glance warning",
+      mode: "severity", grad: true, sev: { high:"#E8675C", mid:"#DCB24A", low:"#4FB0B8" }, quantity:"#5AA9E0" },
+    current: { label: "Current", desc: "systemRed / Orange / Green — today's build", mode: "severity",
+      grad: false, sev: { high:"#FF453A", mid:"#FF9F0A", low:"#30D158" }, quantity:"#64D2FF" },
+  };
+  const ORDER = ["violetWarn", "soft", "violet", "dual", "ocean", "current"];
+
+  // ---------- helpers ----------
+  function lighten(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n>>16)&255, g = (n>>8)&255, b = n&255;
+    r = Math.round(r + (255-r)*amt); g = Math.round(g + (255-g)*amt); b = Math.round(b + (255-b)*amt);
+    return `rgb(${r} ${g} ${b})`;
+  }
+  function accentFor(p, m, provider) {
+    if (m.kind === "quantity") {
+      if (p.mode === "provider") return p.quantityFor[provider];
+      return p.quantity;
+    }
+    if (p.mode === "mono") return p.accent;
+    if (p.mode === "provider") return p.providers[provider];
+    const pct = m.pct, hi = p.thi ?? 80, mid = p.tmid ?? 60;
+    if (p.strict) {
+      if (pct > hi) return p.sev.high;
+      if (pct > mid) return p.sev.mid;
+      return p.sev.low;
+    }
+    if (pct >= hi) return p.sev.high;
+    if (pct >= mid) return p.sev.mid;
+    return p.sev.low;
+  }
+  function fillStyle(p, color) {
+    return p.grad ? `linear-gradient(180deg, ${lighten(color, .18)}, ${color})` : color;
+  }
+
+  // ---------- render ----------
+  function metricHTML(m) {
+    const bar = m.pct === null ? "" :
+      `<div class="meter"><div class="fill" data-pct="${m.pct}"></div></div>`;
+    const detail = m.detail ? `<div class="mdetail">${m.detail}</div>` : "";
+    return `<div class="metric" data-kind="${m.kind}" data-pct="${m.pct}">
+      <div class="mtop"><span class="mtitle">${m.title}</span><span class="mval">${m.val}</span></div>
+      ${bar}${detail}</div>`;
+  }
+  function providerHTML(pr) {
+    const link = pr.usage ? `<a class="plink" href="#">⬈ Usage</a>` : "";
+    return `<section class="provider" data-provider="${pr.name}">
+      <div class="phead"><span class="pname">${pr.name}</span>${link}</div>
+      <div class="pbody">
+        ${pr.metrics.map(metricHTML).join("")}
+        <div class="fetch"><span class="dot"></span>Fetched just now</div>
+      </div></section>`;
+  }
+  function applyPalette(card, p) {
+    card.querySelectorAll(".provider").forEach(sec => {
+      const provider = sec.dataset.provider;
+      sec.querySelectorAll(".metric").forEach((mEl, i) => {
+        const m = { kind: mEl.dataset.kind, pct: mEl.dataset.pct === "null" ? null : +mEl.dataset.pct };
+        const color = accentFor(p, m, provider);
+        mEl.querySelector(".mval").style.color = color;
+        const fill = mEl.querySelector(".fill");
+        if (fill) { fill.style.width = fill.dataset.pct + "%"; fill.style.background = fillStyle(p, color); }
+      });
+    });
+  }
+
+  const grid = document.getElementById("grid");
+  ORDER.forEach(key => {
+    const p = PALETTES[key];
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `
+      <div class="card-label">
+        <h2>${p.label}</h2>${p.badge ? `<span class="badge">${p.badge}</span>` : ""}
+        <p>${p.desc}</p>
+      </div>
+      <div class="popover" data-theme="dark">${PROVIDERS.map(providerHTML).join("")}
+        <div class="divider" style="display:none"></div></div>`;
+    // insert dividers between providers
+    const pop = wrap.querySelector(".popover");
+    const secs = pop.querySelectorAll(".provider");
+    secs.forEach((s, i) => { if (i > 0) s.before(Object.assign(document.createElement("div"), {className:"divider"})); });
+    pop.querySelector(".divider[style]")?.remove();
+    grid.appendChild(wrap.firstElementChild ? wrap : wrap);
+    applyPalette(pop, p);
+    pop._palette = p;
+  });
+
+  // ---------- controls ----------
+  function segWire(id, fn) {
+    const seg = document.getElementById(id);
+    seg.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      seg.querySelectorAll("button").forEach(x => x.classList.remove("on"));
+      b.classList.add("on"); fn(b.dataset.v);
+    });
+  }
+  segWire("theme", v => document.querySelectorAll(".popover").forEach(p => p.dataset.theme = v));
+  segWire("wall", v => document.body.dataset.wall = v);
+  const root = document.documentElement;
+  const TINTS = { "0": "124 111 232", violet: "138 110 240", slate: "120 132 150" };
+  const TINT_A = { "0": 0, violet: 0.14, slate: 0.12 };
+  segWire("tint", v => { root.style.setProperty("--tint-rgb", TINTS[v]); root.style.setProperty("--tint-a", TINT_A[v]); });
+  segWire("barh", v => root.style.setProperty("--meter-h", v + "px"));
+  segWire("barr", v => root.style.setProperty("--meter-r", v + "px"));
+
+  const alpha = document.getElementById("alpha"), alphaVal = document.getElementById("alphaVal");
+  alpha.addEventListener("input", () => {
+    const a = (alpha.value / 100).toFixed(2);
+    root.style.setProperty("--surf-a", a);
+    alphaVal.textContent = a.replace(/^0/, "");
+  });
+</script>
+</body>
+</html>

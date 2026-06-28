@@ -21,9 +21,9 @@ private struct MetricAccent {
 /// "Violet + Warn" palette — tweak the hex values here to retune the bars.
 /// Violet up to 60% used, amber through 80%, coral above 80%.
 private enum UsagePalette {
-    static let low      = MetricAccent(0x8B7FE8)   // violet       (≤60% used)
+    static let low      = MetricAccent(0x8B7FE8)   // violet       (<60% used)
     static let mid      = MetricAccent(0xE3A24A)   // amber        (60–80% used)
-    static let high     = MetricAccent(0xE8675C)   // coral        (>80% used)
+    static let high     = MetricAccent(0xE8675C)   // coral        (≥80% used)
     static let quantity = MetricAccent(0xA99BFF)   // light violet (credits / counts)
 }
 
