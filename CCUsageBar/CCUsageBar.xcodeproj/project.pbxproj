@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A19D0F42C8B94D71B6E23A5C /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = B3F6C91D5A204E8FA7C12D60 /* KeyboardShortcuts */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		684C87B82F57FFA100AE8C4F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A19D0F42C8B94D71B6E23A5C /* KeyboardShortcuts in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = CCUsageBar;
 			packageProductDependencies = (
+				B3F6C91D5A204E8FA7C12D60 /* KeyboardShortcuts */,
 			);
 			productName = CCUsageBar;
 			productReference = 684C87AA2F57FF9F00AE8C4F /* CCUsageBar.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 684C87A12F57FF9F00AE8C4F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C72E4B9A18D34F0E9C65B2A1 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 684C87AB2F57FF9F00AE8C4F /* Products */;
 			projectDirPath = "";
@@ -579,6 +588,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C72E4B9A18D34F0E9C65B2A1 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts";
+			requirement = {
+				kind = exactVersion;
+				version = 1.9.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B3F6C91D5A204E8FA7C12D60 /* KeyboardShortcuts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C72E4B9A18D34F0E9C65B2A1 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
+			productName = KeyboardShortcuts;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 684C87A22F57FF9F00AE8C4F /* Project object */;
 }

@@ -11,17 +11,14 @@ OUT="$ROOT/build"
 APP="$OUT/CCUsageBar.app"
 ENTITLEMENTS="$SRC/CCUsageBar.entitlements"
 
-SDK="$(xcrun --show-sdk-path)"
-TARGET="arm64-apple-macos14.0"
-
 echo "› Compiling…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-# All app sources live directly in $SRC; test targets are in sibling dirs.
-swiftc -swift-version 5 -default-isolation MainActor -sdk "$SDK" -target "$TARGET" -O \
-  "$SRC"/*.swift \
-  -o "$APP/Contents/MacOS/CCUsageBar"
+# Build the Swift executable through SwiftPM so package dependencies are
+# resolved even when using only the Command Line Tools.
+swift build -c release --product CCUsageBar
+cp "$ROOT/.build/release/CCUsageBar" "$APP/Contents/MacOS/CCUsageBar"
 
 # Build AppIcon.icns from the asset-catalog PNGs (Xcode would normally do this).
 ICONSRC="$SRC/Assets.xcassets/AppIcon.appiconset"

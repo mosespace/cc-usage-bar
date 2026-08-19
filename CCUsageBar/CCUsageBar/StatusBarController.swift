@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 
 final class StatusBarController: NSObject, NSPopoverDelegate {
@@ -56,6 +57,10 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             MainActor.assumeIsolated {
                 self?.viewModels.forEach { $0.run(force: true) }
             }
+        }
+
+        KeyboardShortcuts.onKeyUp(for: .toggleUsagePopover) { [weak self] in
+            self?.togglePopover(nil)
         }
     }
 
