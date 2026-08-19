@@ -41,8 +41,16 @@ For the full technical writeup — including the non-obvious Codex discovery (ra
 ## Requirements
 
 - macOS 14 Sonoma or later
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and logged in (`claude` must be on your PATH)
-- (Optional) [Codex](https://github.com/openai/codex) installed and logged in (`codex` must be on your PATH) — if absent, the Codex panel simply shows a setup hint
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and logged in (`claude` must be available as a shell command)
+- (Optional) [Codex](https://github.com/openai/codex) installed and logged in (`codex` must be available as a shell command) — if absent, the Codex panel simply shows a setup hint
+
+CC Usage Bar is a macOS GUI app, so it cannot rely on the same interactive shell
+environment your Terminal has. On launch it bootstraps common CLI locations,
+including Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`), native installer
+paths (`~/.local/bin`), and common Node/version-manager paths (`fnm`, `nvm`,
+`asdf`, `mise`, `nodenv`, `volta`, `pnpm`, `yarn`, npm global prefixes). If you
+installed a CLI somewhere custom, symlink it into one of those locations or add
+that directory to a login-shell PATH.
 
 ## Install
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Finder-launched app bundles now bootstrap common CLI paths before running `claude` or `codex`, including Homebrew, native `~/.local/bin` installs, and common Node/version-manager installs (`fnm`, `nvm`, `asdf`, `mise`, `nodenv`, `volta`, `pnpm`, `yarn`, npm global prefixes).
+
 ## 1.2
 
 - Calmer violet / amber / coral palette with subtle vertical-gradient progress bars (replaces system green/orange/red); wider bars and body-size detail labels for legibility

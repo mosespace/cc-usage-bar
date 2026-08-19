@@ -217,6 +217,94 @@ final class UsageViewModel: ObservableObject {
         }
     }
 
+    /// Finder-launched apps inherit launchd's sparse environment, so user CLIs
+    /// installed under ~/.local/bin or a Node version manager may not be visible.
+    private func shellLaunchCommand(for command: String) -> String {
+        let quotedCommand = shellQuote(command)
+        return """
+        CC_USAGE_COMMAND=\(quotedCommand)
+
+        path_prepend() {
+          [ -d "$1" ] || return
+          case ":${PATH:-}:" in
+            *":$1:"*) ;;
+            *) PATH="$1${PATH:+:$PATH}" ;;
+          esac
+        }
+
+        path_prepend_from_command() {
+          dir="$("$@" 2>/dev/null)" || return
+          [ -n "$dir" ] && path_prepend "$dir"
+        }
+
+        path_prepend_npm_prefix() {
+          prefix="$(npm config get prefix 2>/dev/null)" || return
+          [ -n "$prefix" ] && path_prepend "$prefix/bin"
+        }
+
+        path_prepend "/usr/local/bin"
+        path_prepend "/opt/homebrew/sbin"
+        path_prepend "/opt/homebrew/bin"
+        path_prepend "$HOME/bin"
+        path_prepend "$HOME/.asdf/shims"
+        path_prepend "$HOME/.local/share/mise/shims"
+        path_prepend "$HOME/.mise/shims"
+        path_prepend "$HOME/.nodenv/shims"
+        path_prepend "$HOME/.cargo/bin"
+        path_prepend "$HOME/.bun/bin"
+        path_prepend "$HOME/.volta/bin"
+        path_prepend "$HOME/.npm-global/bin"
+        path_prepend "$HOME/.yarn/bin"
+        path_prepend "$HOME/.config/yarn/global/node_modules/.bin"
+        path_prepend "$HOME/Library/pnpm"
+        path_prepend "$HOME/.local/bin"
+        path_prepend "$HOME/Library/Application Support/fnm"
+        export PATH
+
+        bootstrap_node_paths() {
+          if command -v fnm >/dev/null 2>&1; then
+            eval "$(fnm env --shell zsh)"
+          fi
+
+          if [ -n "${NVM_DIR:-}" ] && [ -s "$NVM_DIR/nvm.sh" ]; then
+            . "$NVM_DIR/nvm.sh" --no-use
+          elif [ -s "$HOME/.nvm/nvm.sh" ]; then
+            . "$HOME/.nvm/nvm.sh" --no-use
+          fi
+
+          for dir in "$HOME"/.nvm/versions/node/*/bin(N); do
+            path_prepend "$dir"
+          done
+
+          if command -v npm >/dev/null 2>&1; then
+            path_prepend_npm_prefix
+          fi
+          if command -v pnpm >/dev/null 2>&1; then
+            path_prepend_from_command pnpm bin -g
+          fi
+          if command -v yarn >/dev/null 2>&1; then
+            path_prepend_from_command yarn global bin
+          fi
+          export PATH
+        }
+
+        if ! command -v "$CC_USAGE_COMMAND" >/dev/null 2>&1; then
+          bootstrap_node_paths
+        fi
+
+        if ! command -v "$CC_USAGE_COMMAND" >/dev/null 2>&1; then
+          print -u2 "CCUsageBar: $CC_USAGE_COMMAND is not installed or could not be found on PATH."
+          exit 127
+        fi
+
+        exec "$CC_USAGE_COMMAND"
+        """
+    }
+
+    private func shellQuote(_ value: String) -> String {
+        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
+    }
+
     private func launchSession(queryId: Int) {
         // Open PTY master
         let master = posix_openpt(O_RDWR | O_NOCTTY)
@@ -240,6 +328,7 @@ final class UsageViewModel: ObservableObject {
 
         // Resolve (and create) the working directory in the parent, before fork.
         let workdir = resolvedWorkdir()
+        let launchCommand = shellLaunchCommand(for: provider.command)
 
         let pid = _fork()
         guard pid >= 0 else {
@@ -265,9 +354,10 @@ final class UsageViewModel: ObservableObject {
             // Start in the provider's working directory (fresh temp for Claude so it
             // has no project context; a stable trusted dir for Codex).
             _ = workdir.withCString { chdir($0) }
-            // Use a login shell so the CLI is found on the user's PATH.
+            // Use a login shell plus a GUI-safe PATH bootstrap so Finder-launched
+            // app bundles can find user-installed CLIs.
             var args: [UnsafeMutablePointer<Int8>?] = [
-                strdup("/bin/zsh"), strdup("-l"), strdup("-c"), strdup(provider.command), nil
+                strdup("/bin/zsh"), strdup("-l"), strdup("-c"), strdup(launchCommand), nil
             ]
             execv("/bin/zsh", &args)
             _exit(127)
