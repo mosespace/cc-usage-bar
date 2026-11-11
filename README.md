@@ -40,7 +40,7 @@ For the full technical writeup — including the non-obvious Codex discovery (ra
 
 ## Requirements
 
-- macOS 14 Sonoma or later
+- macOS 12 Monterey or later (Intel or Apple Silicon)
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and logged in (`claude` must be available as a shell command)
 - (Optional) [Codex](https://github.com/openai/codex) installed and logged in (`codex` must be available as a shell command) — if absent, the Codex panel simply shows a setup hint
 

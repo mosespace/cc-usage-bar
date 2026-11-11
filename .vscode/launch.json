@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:cc-usage-bar}",
+      "name": "Debug CCUsageBar",
+      "target": "CCUsageBar",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug CCUsageBar"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:cc-usage-bar}",
+      "name": "Release CCUsageBar",
+      "target": "CCUsageBar",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release CCUsageBar"
+    }
+  ]
+}
