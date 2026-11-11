@@ -38,16 +38,48 @@ private extension Color {
     }
 }
 
+/// Popover sizing: each visible provider gets a fixed slice and the sessions
+/// pager sits underneath, so the window is only as tall as what's shown.
+enum PopoverLayout {
+    static func providerHeight(_ providerID: String) -> CGFloat {
+        providerID == "claude" ? 250 : 220
+    }
+
+    static func sessionsHeight(count: Int) -> CGFloat {
+        count == 0 ? 90 : 200
+    }
+}
+
 /// The popover content: one labeled section per provider, stacked vertically.
 struct UsageStackView: View {
     let viewModels: [UsageViewModel]
+    @ObservedObject var sessionMonitor: SessionUsageMonitor
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(Array(viewModels.enumerated()), id: \.offset) { index, viewModel in
-                if index > 0 {
-                    Divider()
-                }
+            ForEach(Array(viewModels.enumerated()), id: \.offset) { _, viewModel in
+                ProviderBlock(viewModel: viewModel)
+            }
+            if let claude = viewModels.first(where: { $0.provider.id == "claude" }) {
+                SessionsBlock(viewModel: claude, monitor: sessionMonitor)
+            }
+        }
+        .frame(width: 520)
+        .frame(maxHeight: .infinity)
+        .background(.regularMaterial)
+    }
+}
+
+/// One provider's header + content, hidden entirely when its CLI isn't installed.
+private struct ProviderBlock: View {
+    @ObservedObject var viewModel: UsageViewModel
+
+    var body: some View {
+        if case .notInstalled = viewModel.state {
+            EmptyView()
+        } else {
+            VStack(spacing: 0) {
+                Divider()
                 ProviderHeader(
                     title: viewModel.provider.displayName,
                     usageURL: viewModel.provider.usageURL
@@ -56,8 +88,24 @@ struct UsageStackView: View {
                     .frame(maxHeight: .infinity)
             }
         }
-        .frame(width: 520, height: 440)
-        .background(.regularMaterial)
+    }
+}
+
+/// Open-sessions section, shown only while Claude Code is installed.
+private struct SessionsBlock: View {
+    @ObservedObject var viewModel: UsageViewModel
+    @ObservedObject var monitor: SessionUsageMonitor
+
+    var body: some View {
+        if case .notInstalled = viewModel.state {
+            EmptyView()
+        } else {
+            VStack(spacing: 0) {
+                Divider()
+                SessionsSection(sessions: monitor.sessions)
+                    .frame(height: PopoverLayout.sessionsHeight(count: monitor.sessions.count))
+            }
+        }
     }
 }
 
@@ -154,6 +202,9 @@ struct ProviderSection: View {
                     }
                     .padding()
                 }
+
+            case .notInstalled:
+                Color.clear
 
             case .error(let message):
                 ZStack(alignment: .topLeading) {
@@ -305,4 +356,148 @@ private func fetchAgeText(_ capturedAt: Date) -> String {
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .abbreviated
     return "Fetched \(formatter.localizedString(for: capturedAt, relativeTo: Date()))"
+}
+
+// MARK: - Open sessions
+
+/// One open Claude Code session at a time, with arrows (or ← / →) to cycle.
+private struct SessionsSection: View {
+    let sessions: [SessionUsage]
+    @State private var selectedID: String?
+
+    private var index: Int {
+        sessions.firstIndex(where: { $0.id == selectedID }) ?? 0
+    }
+
+    private func step(_ delta: Int) {
+        guard !sessions.isEmpty else { return }
+        selectedID = sessions[(index + delta + sessions.count) % sessions.count].id
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Text("Open sessions")
+                    .font(.system(.caption, design: .monospaced).weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                if sessions.count > 1 {
+                    Button { step(-1) } label: { Image(systemName: "chevron.left") }
+                        .keyboardShortcut(.leftArrow, modifiers: [])
+                        .help("Previous session")
+                    Text("\(index + 1) / \(sessions.count)")
+                        .font(.system(.caption, design: .monospaced).weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    Button { step(1) } label: { Image(systemName: "chevron.right") }
+                        .keyboardShortcut(.rightArrow, modifiers: [])
+                        .help("Next session")
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(linkColor)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(headerColor)
+
+            if sessions.isEmpty {
+                Text("No open Claude Code sessions")
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                SessionDetailView(session: sessions[index])
+            }
+        }
+    }
+}
+
+private struct SessionDetailView: View {
+    let session: SessionUsage
+
+    var body: some View {
+        let percent = Int((session.contextFraction * 100).rounded())
+        let accent = percent >= 80 ? UsagePalette.high : percent >= 60 ? UsagePalette.mid : UsagePalette.low
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(session.isBusy ? UsagePalette.mid.base : statusDotColor)
+                    .frame(width: 8, height: 8)
+                Text(session.name)
+                    .font(.system(.body, design: .monospaced).weight(.semibold))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 8)
+                Text("\(session.isBusy ? "working" : "idle") \u{00B7} \(sessionAgeText(session.updatedAt))")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            // Current context window fill.
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Context window")
+                        .font(.system(.callout, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    Text("\(compactCount(session.lastContextTokens)) / \(compactCount(session.contextWindow)) \u{00B7} \(percent)%")
+                        .font(.system(.callout, design: .monospaced).weight(.semibold))
+                        .foregroundStyle(accent.base)
+                }
+                MetricBarView(progress: session.contextFraction, accent: accent)
+            }
+
+            HStack(spacing: 14) {
+                stat("tokens", compactCount(session.totalTokens))
+                stat("last reply", compactCount(session.lastOutputTokens))
+                stat("messages", "\(session.messageCount)")
+                Spacer(minLength: 0)
+            }
+
+            if let prompt = session.lastPrompt {
+                Text("\u{201C}\(prompt)\u{201D}")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .help(session.project)
+    }
+
+    private func stat(_ label: String, _ value: String) -> some View {
+        HStack(spacing: 5) {
+            Text(value)
+                .font(.system(.callout, design: .monospaced).weight(.semibold))
+                .foregroundStyle(UsagePalette.quantity.base)
+            Text(label)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private func sessionAgeText(_ date: Date) -> String {
+    let age = max(Date().timeIntervalSince(date), 0)
+    switch age {
+    case ..<60: return "just now"
+    case ..<3600: return "\(Int(age / 60))m ago"
+    case ..<86_400: return "\(Int(age / 3600))h ago"
+    default: return "\(Int(age / 86_400))d ago"
+    }
+}
+
+private func compactCount(_ n: Int) -> String {
+    switch n {
+    case ..<1_000: return "\(n)"
+    case ..<1_000_000: return String(format: "%.1fk", Double(n) / 1_000)
+    default: return String(format: "%.2fM", Double(n) / 1_000_000)
+    }
 }

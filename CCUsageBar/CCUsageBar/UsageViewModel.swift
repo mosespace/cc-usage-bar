@@ -40,6 +40,7 @@ enum UsageState {
     case loaded(UsageSnapshot)
     case rateLimited
     case needsSetup
+    case notInstalled
     case error(String)
 }
 
@@ -402,7 +403,10 @@ final class UsageViewModel: ObservableObject {
                 if swiftWIFEXITED(exitStatus) && swiftWEXITSTATUS(exitStatus) != 0 {
                     let code = swiftWEXITSTATUS(exitStatus)
                     self.isFetching = false
-                    self.state = .error("\(self.provider.command) exited with code \(code). Is it installed and on your PATH?")
+                    // 127 = our launch script couldn't find the CLI at all.
+                    self.state = code == 127
+                        ? .notInstalled
+                        : .error("\(self.provider.command) exited with code \(code).")
                     self.teardownSession()
                 }
             }
@@ -473,9 +477,14 @@ final class UsageViewModel: ObservableObject {
                         log.info("→ gate '\(gate.trigger)' detected, responding")
                         self.handledGates.insert(gate.trigger)
                         self.resetScan()
-                        let send = gate.send
+                        let send = gate.send, followUp = gate.followUp, delay = gate.delay
                         DispatchQueue.global(qos: .userInitiated).async {
+                            if delay > 0 { Thread.sleep(forTimeInterval: delay) }
                             ptySend(send, to: master)
+                            if let followUp {
+                                Thread.sleep(forTimeInterval: 0.4)
+                                ptySend(followUp, to: master)
+                            }
                         }
                     } else if self.provider.bootDelay == nil, hasRegex(self.provider.bannerPattern) {
                         log.info("→ banner detected, submitting \(self.provider.usageCommand)")

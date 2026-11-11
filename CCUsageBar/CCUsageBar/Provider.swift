@@ -6,14 +6,19 @@ import Foundation
 struct LaunchGate {
     let trigger: String
     let send: String
+    /// Optional second keystroke sent shortly after `send` (some selectors need the
+    /// arrow key processed before Enter, so they can't go in one write).
+    var followUp: String? = nil
+    /// Wait this long before sending, so the prompt is ready to accept input.
+    var delay: TimeInterval = 0
 }
 
 /// Where the CLI session runs.
 enum Workdir {
     /// A fresh empty temp directory each launch (so the CLI has no project context).
     case freshTemp
-    /// A persistent directory (path may start with `~`). Used so Codex's one-time
-    /// folder-trust grant persists and the prompt only appears on the first run ever.
+    /// A persistent empty directory (path may start with `~`). Used so the CLI's
+    /// one-time folder-trust grant persists and the prompt only appears on the first run ever.
     case stable(String)
 }
 
@@ -89,7 +94,11 @@ extension Provider {
         usageCommand: "/usage",
         ptyRows: 24, ptyCols: 68,
         bannerPattern: "Claude Code v\\d+",
-        gates: [LaunchGate(trigger: "Quick safety check", send: "\r")],
+        gates: [
+            // Folder-trust prompt. Its default is "No, exit", so move Down to
+            // "Yes, I trust this folder" and then confirm.
+            LaunchGate(trigger: "Quick safety check", send: "\u{1B}[B", followUp: "\r", delay: 1.5),
+        ],
         commandEcho: "/usage",
         submitDelay: 0,
         resultTrigger: "Current session",
@@ -103,7 +112,7 @@ extension Provider {
         ],
         needsSigwinchRedraw: true,
         trim: .fromMarker("Current session"),
-        workdir: .freshTemp,
+        workdir: .stable("~/Library/Application Support/CCUsageBar/claude-workdir"),
         reusesSession: true
     )
 
