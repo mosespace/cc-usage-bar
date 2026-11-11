@@ -8,7 +8,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 SRC="$ROOT/CCUsageBar/CCUsageBar"
 OUT="$ROOT/build"
-APP="$OUT/CCUsageBar.app"
+BUILD_DIR="${CCUSAGEBAR_BUILD_DIR:-$OUT}"
+APP="$BUILD_DIR/CCUsageBar.app"
 ENTITLEMENTS="$SRC/CCUsageBar.entitlements"
 
 echo "› Compiling…"
@@ -17,8 +18,13 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 # Build the Swift executable through SwiftPM so package dependencies are
 # resolved even when using only the Command Line Tools.
-swift build -c release --product CCUsageBar
-cp "$ROOT/.build/release/CCUsageBar" "$APP/Contents/MacOS/CCUsageBar"
+if [[ -n "${CCUSAGEBAR_ARCH:-}" ]]; then
+  swift build -c release --product CCUsageBar --triple "${CCUSAGEBAR_ARCH}-apple-macosx12.0"
+  cp "$ROOT/.build/${CCUSAGEBAR_ARCH}-apple-macosx/release/CCUsageBar" "$APP/Contents/MacOS/CCUsageBar"
+else
+  swift build -c release --product CCUsageBar
+  cp "$ROOT/.build/release/CCUsageBar" "$APP/Contents/MacOS/CCUsageBar"
+fi
 
 # Build AppIcon.icns from the asset-catalog PNGs (Xcode would normally do this).
 ICONSRC="$SRC/Assets.xcassets/AppIcon.appiconset"
