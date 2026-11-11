@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Open sessions** section: one card per open Claude Code session with working/idle status, context window fill, total tokens, last reply size, message count and the last prompt. Cycle with the `‹ ›` arrows or ← / →. Read locally from `~/.claude`; the session list is refreshed every 3 seconds while the popover is open
+- Providers whose CLI isn't installed are hidden instead of showing an error, and the popover now sizes itself to what's visible (shorter with only Claude)
+- Fixed Claude failing with "Timed out (stage: waitingForBanner)": newer Claude Code versions default the folder-trust prompt to "No, exit". The prompt is now answered correctly, and Claude runs in a stable folder so it is only asked once
+- Launch gates can now send a delayed follow-up keystroke (needed for arrow-key selectors)
+- Missing `import AppKit` that broke the Xcode build
+- Redesigned threshold notifications: severity emoji in the title, the metric as the subtitle, a progress bar plus reset time in the body, a coloured progress-ring thumbnail, and grouping per provider
+- Fixed threshold alerts being swallowed when the CLI's reset time wobbled by a minute (e.g. 4:59am ↔ 5:00am), which was treated as a new window and reset the baseline
+- Refreshed README screenshots (light, dark and split hero)
 - Lowered the minimum macOS version to 12 Monterey (was 14 Sonoma for SwiftPM / `build.sh` builds and 26.2 for the Xcode project), so the app runs on older Macs
 - Finder-launched app bundles now bootstrap common CLI paths before running `claude` or `codex`, including Homebrew, native `~/.local/bin` installs, and common Node/version-manager installs (`fnm`, `nvm`, `asdf`, `mise`, `nodenv`, `volta`, `pnpm`, `yarn`, npm global prefixes).
 

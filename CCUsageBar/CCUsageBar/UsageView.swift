@@ -46,7 +46,7 @@ enum PopoverLayout {
     }
 
     static func sessionsHeight(count: Int) -> CGFloat {
-        count == 0 ? 90 : 200
+        count == 0 ? 90 : 175
     }
 }
 
